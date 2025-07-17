@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String   @id @default(uuid())
+  email    String?   @unique
+  password String?
+  role     Role
+  firstName String
+  lastName  String
+
+  stylistOrders Order[] @relation("StylistUser")
+  cashierOrders Order[] @relation("CashierUser")
+  operatorOrders Order[] @relation("OperatorUser")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id    String  @id @default(uuid())
+  dni   String? @unique
+  name  String?
+  phone String?
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Treatment {
+  id    String @id @default(uuid())
+  name  String
+  price Float
+  percentage Float
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id         String   @id @default(uuid())
+
+  stylistId  String
+  stylist    User     @relation("StylistUser", fields: [stylistId], references: [id])
+
+  operatorId  String
+  operator    User     @relation("OperatorUser", fields: [operatorId], references: [id])
+
+  cashierId  String
+  cashier    User     @relation("CashierUser", fields: [cashierId], references: [id])
+
+  clientId   String?
+  client     Client?  @relation(fields: [clientId], references: [id])
+
+  treatmentId String
+  treatment   Treatment  @relation(fields: [treatmentId], references: [id])
+
+  paidAmount    Float?
+  paymentMethod PaymentMethod?
+  status        OrderStatus @default(Created)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  Stylist
+  Cashier
+  Operator
+}
+
+enum OrderStatus {
+  Created
+  Claimed
+  Completed
+}
+
+enum PaymentMethod {
+  Cash
+  Yape
+  Card
+}
