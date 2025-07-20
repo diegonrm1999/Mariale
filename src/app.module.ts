@@ -5,11 +5,14 @@ import { AuthController } from './auth/auth.controller';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TreatmentsModule } from './treatments/treatments.module';
 import { OrdersService } from './orders/orders.service';
 import { OrdersController } from './orders/orders.controller';
 import { Usercontroller } from './users/user.controller';
+import { ClientsModule } from './client/clients.module';
+import { OrdersGateway } from './orders/orders.gateway';
+import reniecConfig from './config/reniec.config';
 
 @Module({
   imports: [
@@ -18,10 +21,17 @@ import { Usercontroller } from './users/user.controller';
     AuthModule,
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [reniecConfig],
     }),
     TreatmentsModule,
+    ClientsModule,
   ],
-  controllers: [AppController, AuthController, OrdersController, Usercontroller],
-  providers: [AppService, OrdersService],
+  controllers: [
+    AppController,
+    AuthController,
+    OrdersController,
+    Usercontroller,
+  ],
+  providers: [AppService, OrdersService, ConfigService, OrdersGateway],
 })
 export class AppModule {}

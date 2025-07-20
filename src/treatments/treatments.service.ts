@@ -10,7 +10,6 @@ export class TreatmentsService {
     return this.prisma.treatment.create({
       data: {
         name: dto.name,
-        price: dto.price,
         percentage: dto.percentage,
       },
     });

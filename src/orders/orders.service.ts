@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { OrderStatus, Role } from '@prisma/client';
-import { UpdateOrderDto } from './dto/update_order.dto';
+import { OrdersGateway } from './orders.gateway';
+import { CompleteOrderDto } from './dto/complete-order.dto';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly orderGateway: OrdersGateway,
+  ) {}
 
   async createOrder(dto: CreateOrderDto, userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -41,55 +45,112 @@ export class OrdersService {
             dni: dto.clientDni,
             name: dto.clientName,
             phone: dto.clientPhone,
+            email: dto.clientEmail,
           },
         });
       }
 
       clientId = client.id;
     } else {
-      let newClient = await this.prisma.client.create({
-        data: {
-          name: dto.clientName,
-          phone: dto.clientPhone,
-        },
-      });
-
-      clientId = newClient.id;
+      throw new Error('DNI del cliente es obligatorio para crear la orden');
     }
 
-    return this.prisma.order.create({
+    const createdOrder = this.prisma.order.create({
       data: {
         stylistId: dto.stylistId,
         cashierId: dto.cashierId,
         clientId: clientId,
         treatmentId: treatment.id,
         operatorId: userId,
+        price: dto.price
+      },
+    });
+    this.orderGateway.emitOrderCreated(createdOrder);
+    return createdOrder;
+  }
+
+  async completeOrder(id: string, dto: CompleteOrderDto) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    if (order.status === 'Completed') {
+      throw new Error('Order is already completed');
+    }
+
+    return this.prisma.order.update({
+      where: { id },
+      data: {
+        paidAmount: dto.paidAmount,
+        paymentMethod: dto.paymentMethod,
+        status: 'Completed',
+        ticketNumber: dto.ticketNumber,
       },
     });
   }
 
-  async updateOrderById(id: string, dto: UpdateOrderDto) {
-    const existing = await this.prisma.order.findUnique({ where: { id } });
+  async updateOrderById(id: string, dto: CreateOrderDto) {
+    const existing = await this.prisma.order.findUnique({
+      where: { id },
+      include: { client: true },
+    });
 
     if (!existing) {
       throw new Error(`Order with ID ${id} not found`);
     }
-    console.log('Updating client information for order', dto.clientId);
-    if (dto.clientId && (dto.clientName || dto.clientPhone || dto.clientDni)) {
-      console.log('Updating client information for order', id);
+
+    if (existing.status === OrderStatus.Completed) {
+      throw new Error('Cannot update a completed order');
+    }
+
+    const isSameDni = dto.clientDni === existing.client.dni;
+    let clientIdToUse = existing.clientId;
+
+    if (isSameDni) {
       await this.prisma.client.update({
-        where: { id: dto.clientId },
+        where: { id: existing.clientId },
         data: {
-          name: dto.clientName ?? undefined,
-          phone: dto.clientPhone ?? undefined,
-          dni: dto.clientDni ?? undefined,
+          name: dto.clientName,
+          phone: dto.clientPhone,
+          email: dto.clientEmail,
         },
       });
+    } else {
+      const existingClient = await this.prisma.client.findUnique({
+        where: { dni: dto.clientDni },
+      });
+
+      if (existingClient) {
+        await this.prisma.client.update({
+          where: { id: existingClient.id },
+          data: {
+            name: dto.clientName,
+            phone: dto.clientPhone,
+            email: dto.clientEmail,
+          },
+        });
+
+        clientIdToUse = existingClient.id;
+      } else {
+        const newClient = await this.prisma.client.create({
+          data: {
+            dni: dto.clientDni,
+            name: dto.clientName,
+            phone: dto.clientPhone,
+            email: dto.clientEmail,
+          },
+        });
+
+        clientIdToUse = newClient.id;
+      }
     }
-    console.log('Updating order with ID:', id, 'with data:', dto);
+
     return this.prisma.order.update({
       where: { id },
       data: {
+        client: { connect: { id: clientIdToUse } },
         ...(dto.treatmentId && {
           treatment: { connect: { id: dto.treatmentId } },
         }),
@@ -99,6 +160,7 @@ export class OrdersService {
         ...(dto.cashierId && {
           cashier: { connect: { id: dto.cashierId } },
         }),
+        price: dto.price,
       },
     });
   }
@@ -160,11 +222,12 @@ export class OrdersService {
       select: {
         id: true,
         createdAt: true,
+        price: true,
+        orderNumber: true,
         treatment: {
           select: {
             id: true,
             name: true,
-            price: true,
           },
         },
         cashier: {

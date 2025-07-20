@@ -13,7 +13,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { OrdersService } from './orders.service';
 import { Request } from 'express';
 import { Role } from '@prisma/client';
-import { UpdateOrderDto } from './dto/update_order.dto';
+import { CompleteOrderDto } from './dto/complete-order.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -38,8 +38,13 @@ export class OrdersController {
     return this.ordersService.getOrderById(id);
   }
 
+  @Patch(':id/complete')
+  async completeOrder(@Param('id') id: string, @Body() dto: CompleteOrderDto) {
+    return this.ordersService.completeOrder(id, dto);
+  }
+
   @Patch(':id')
-  async updateOrderById(@Param('id') id: string, @Body() dto: UpdateOrderDto) {
+  async updateOrderById(@Param('id') id: string, @Body() dto: CreateOrderDto) {
     return this.ordersService.updateOrderById(id, dto);
   }
 }
