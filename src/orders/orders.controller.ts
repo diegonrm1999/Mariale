@@ -12,7 +12,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { OrdersService } from './orders.service';
 import { Request } from 'express';
-import { Role } from '@prisma/client';
+import { OrderStatus, Role } from '@prisma/client';
 import { CompleteOrderDto } from './dto/complete-order.dto';
 
 @Controller('orders')
@@ -29,7 +29,18 @@ export class OrdersController {
   @Get('active')
   async getPendingOrders(@Req() req: Request) {
     const user = req.user as { id: string; rol: Role };
-    return this.ordersService.getPendingOrdersForUser(user);
+    return this.ordersService.getPendingOrdersForUser(user, [
+      OrderStatus.Created,
+    ]);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('completed')
+  async getCompletedOrders(@Req() req: Request) {
+    const user = req.user as { id: string; rol: Role };
+    return this.ordersService.getPendingOrdersForUser(user, [
+      OrderStatus.Completed,
+    ]);
   }
 
   @UseGuards(AuthGuard('jwt'))

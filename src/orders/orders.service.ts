@@ -62,7 +62,7 @@ export class OrdersService {
         clientId: clientId,
         treatmentId: treatment.id,
         operatorId: userId,
-        price: dto.price
+        price: dto.price,
       },
     });
     this.orderGateway.emitOrderCreated(createdOrder);
@@ -197,7 +197,10 @@ export class OrdersService {
     };
   }
 
-  async getPendingOrdersForUser(user: { id: string; rol: Role }) {
+  async getPendingOrdersForUser(
+    user: { id: string; rol: Role },
+    statuses: OrderStatus[],
+  ) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -208,12 +211,12 @@ export class OrdersService {
       user.rol === Role.Cashier
         ? {
             cashierId: user.id,
-            status: { not: OrderStatus.Completed },
+            status: { in: statuses },
             createdAt: { gte: startOfDay, lte: endOfDay },
           }
         : {
             operatorId: user.id,
-            status: { not: OrderStatus.Completed },
+            status: { in: statuses },
             createdAt: { gte: startOfDay, lte: endOfDay },
           };
 
