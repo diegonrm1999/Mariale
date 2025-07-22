@@ -51,18 +51,26 @@ export class OrdersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Patch(':id/complete')
-  async completeOrder(@Param('id') id: string, @Body() dto: CompleteOrderDto) {
-    return this.ordersService.completeOrder(id, dto);
+  async completeOrder(
+    @Param('id') id: string,
+    @Body() dto: CompleteOrderDto,
+    @Req() req: any,
+  ) {
+    return this.ordersService.completeOrder(id, dto, req.user.id);
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
-  async updateOrderById(@Param('id') id: string, @Body() dto: CreateOrderDto) {
-    return this.ordersService.updateOrderById(id, dto);
+  async updateOrderById(
+    @Param('id') id: string,
+    @Body() dto: CreateOrderDto,
+    @Req() req: any,
+  ) {
+    return this.ordersService.updateOrderById(id, dto, req.user.id);
   }
 
   @Patch(':id/restore')
-  restoreOrder(@Param('id') id: string) {
-    return this.ordersService.restoreOrder(id);
+  restoreOrder(@Param('id') id: string, @Req() req: any) {
+    return this.ordersService.restoreOrder(id, req.user.id);
   }
 }

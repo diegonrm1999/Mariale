@@ -99,7 +99,7 @@ export class OrdersService {
     return createdOrder;
   }
 
-  async restoreOrder(id: string) {
+  async restoreOrder(id: string, userId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
     });
@@ -118,12 +118,12 @@ export class OrdersService {
         status: OrderStatus.Created,
       },
     });
-    
-    this.orderGateway.completeRefresh(order.operatorId);
+
+    this.orderGateway.completeRefresh(userId);
     return restoredOrder;
   }
 
-  async completeOrder(id: string, dto: CompleteOrderDto) {
+  async completeOrder(id: string, dto: CompleteOrderDto, userId: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
 
     if (!order) {
@@ -148,11 +148,11 @@ export class OrdersService {
       },
     });
 
-    this.orderGateway.completeRefresh(order.operatorId);
+    this.orderGateway.completeRefresh(userId);
     return orderUpdated;
   }
 
-  async updateOrderById(id: string, dto: CreateOrderDto) {
+  async updateOrderById(id: string, dto: CreateOrderDto, userId: string) {
     const existing = await this.prisma.order.findUnique({
       where: { id },
       include: { client: true },
@@ -229,7 +229,7 @@ export class OrdersService {
         treatments: true,
       },
     });
-    this.orderGateway.emitOrderRefresh(updatedOrder.operatorId);
+    this.orderGateway.emitOrderRefresh(userId);
     return updatedOrder;
   }
 
