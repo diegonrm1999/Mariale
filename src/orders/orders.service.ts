@@ -94,7 +94,11 @@ export class OrdersService {
         treatments: true,
       },
     });
-    this.orderGateway.emitOrderRefresh(userId);
+    this.orderGateway.emitOrderRefresh(
+      createdOrder.operatorId,
+      createdOrder.cashierId,
+      userId,
+    );
     await this.sendOrderCreatedNotification(dto, createdOrder.id);
     return createdOrder;
   }
@@ -119,7 +123,11 @@ export class OrdersService {
       },
     });
 
-    this.orderGateway.completeRefresh(userId);
+    this.orderGateway.completeRefresh(
+      order.operatorId,
+      order.cashierId,
+      userId,
+    );
     return restoredOrder;
   }
 
@@ -148,7 +156,11 @@ export class OrdersService {
       },
     });
 
-    this.orderGateway.completeRefresh(userId);
+    this.orderGateway.completeRefresh(
+      order.operatorId,
+      order.cashierId,
+      userId,
+    );
     return orderUpdated;
   }
 
@@ -229,7 +241,11 @@ export class OrdersService {
         treatments: true,
       },
     });
-    this.orderGateway.emitOrderRefresh(userId);
+    this.orderGateway.emitOrderRefresh(
+      updatedOrder.operatorId,
+      updatedOrder.cashierId,
+      userId,
+    );
     return updatedOrder;
   }
 
@@ -302,11 +318,17 @@ export class OrdersService {
             status: { in: statuses },
             createdAt: { gte: startOfDay, lte: endOfDay },
           }
-        : {
-            operatorId: user.id,
-            status: { in: statuses },
-            createdAt: { gte: startOfDay, lte: endOfDay },
-          };
+        : user.rol === Role.Operator
+          ? {
+              operatorId: user.id,
+              status: { in: statuses },
+              createdAt: { gte: startOfDay, lte: endOfDay },
+            }
+          : {
+              OR: [{ cashierId: user.id }, { operatorId: user.id }],
+              status: { in: statuses },
+              createdAt: { gte: startOfDay, lte: endOfDay },
+            };
 
     return this.prisma.order.findMany({
       where: whereClause,

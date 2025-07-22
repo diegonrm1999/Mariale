@@ -69,6 +69,7 @@ export class OrdersController {
     return this.ordersService.updateOrderById(id, dto, req.user.id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Patch(':id/restore')
   restoreOrder(@Param('id') id: string, @Req() req: any) {
     return this.ordersService.restoreOrder(id, req.user.id);
