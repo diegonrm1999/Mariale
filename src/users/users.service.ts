@@ -35,7 +35,11 @@ export class UsersService {
 
   async findCashiers() {
     return this.prisma.user.findMany({
-      where: { role: Role.Cashier },
+      where: {
+        role: {
+          in: [Role.Cashier, Role.Manager],
+        },
+      },
     });
   }
 

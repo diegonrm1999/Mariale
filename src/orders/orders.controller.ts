@@ -49,13 +49,20 @@ export class OrdersController {
     return this.ordersService.getOrderById(id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Patch(':id/complete')
   async completeOrder(@Param('id') id: string, @Body() dto: CompleteOrderDto) {
     return this.ordersService.completeOrder(id, dto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
   async updateOrderById(@Param('id') id: string, @Body() dto: CreateOrderDto) {
     return this.ordersService.updateOrderById(id, dto);
+  }
+
+  @Patch(':id/restore')
+  restoreOrder(@Param('id') id: string) {
+    return this.ordersService.restoreOrder(id);
   }
 }

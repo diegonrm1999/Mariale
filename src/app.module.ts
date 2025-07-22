@@ -12,6 +12,7 @@ import { OrdersController } from './orders/orders.controller';
 import { Usercontroller } from './users/user.controller';
 import { ClientsModule } from './client/clients.module';
 import { OrdersGateway } from './orders/orders.gateway';
+import { FcmModule } from './fcm/fcm.module';
 import reniecConfig from './config/reniec.config';
 
 @Module({
@@ -25,6 +26,7 @@ import reniecConfig from './config/reniec.config';
     }),
     TreatmentsModule,
     ClientsModule,
+    FcmModule,
   ],
   controllers: [
     AppController,

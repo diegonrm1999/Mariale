@@ -1,86 +1,144 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { OrderStatus, Role } from '@prisma/client';
 import { OrdersGateway } from './orders.gateway';
 import { CompleteOrderDto } from './dto/complete-order.dto';
+import { FcmService } from 'src/fcm/fcm.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private readonly orderGateway: OrdersGateway,
+    private readonly fcmService: FcmService,
   ) {}
+
+  private async sendOrderCreatedNotification(
+    dto: CreateOrderDto,
+    orderId: string,
+  ) {
+    try {
+      await this.fcmService.sendToTopic(
+        `cashier_${dto.cashierId}`,
+        'Nueva orden creada',
+        'Tienes una nueva orden para completar',
+        {
+          orderId: orderId,
+          type: 'new_order',
+        },
+      );
+    } catch (err) {
+      console.error('Error enviando notificación FCM:', err);
+    }
+  }
 
   async createOrder(dto: CreateOrderDto, userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!user || user.role !== Role.Operator) {
-      throw new Error('Solo operadores pueden crear órdenes');
+    if (!user || (user.role !== Role.Operator && user.role !== Role.Manager)) {
+      throw new Error('No tienes permisos para crear órdenes');
     }
 
-    if (!dto.treatmentId || !dto.stylistId || !dto.cashierId) {
-      throw new Error('Faltan datos obligatorios para crear la orden');
-    }
+    const treatmentIds = dto.treatments.map((t) => t.treatmentId);
 
-    const treatment = await this.prisma.treatment.findUnique({
-      where: { id: dto.treatmentId },
+    const treatments = await this.prisma.treatment.findMany({
+      where: { id: { in: treatmentIds } },
     });
 
-    if (!treatment) {
-      throw new Error('Servicio no encontrado');
+    if (treatments.length !== treatmentIds.length) {
+      throw new Error('Uno o más tratamientos no fueron encontrados');
     }
 
-    let clientId: string | null = null;
-    if (dto.clientDni) {
-      let client = await this.prisma.client.findUnique({
-        where: { dni: dto.clientDni },
+    let client = await this.prisma.client.findUnique({
+      where: { dni: dto.clientDni },
+    });
+
+    if (!client) {
+      client = await this.prisma.client.create({
+        data: {
+          dni: dto.clientDni,
+          name: dto.clientName,
+          phone: dto.clientPhone,
+          email: dto.clientEmail,
+        },
       });
-
-      if (!client) {
-        client = await this.prisma.client.create({
-          data: {
-            dni: dto.clientDni,
-            name: dto.clientName,
-            phone: dto.clientPhone,
-            email: dto.clientEmail,
-          },
-        });
-      }
-
-      clientId = client.id;
-    } else {
-      throw new Error('DNI del cliente es obligatorio para crear la orden');
     }
 
-    const createdOrder = this.prisma.order.create({
+    const totalPrice = dto.treatments.reduce(
+      (sum, treatment) => sum + treatment.price,
+      0,
+    );
+
+    const createdOrder = await this.prisma.order.create({
       data: {
         stylistId: dto.stylistId,
         cashierId: dto.cashierId,
-        clientId: clientId,
-        treatmentId: treatment.id,
+        clientId: client.id,
         operatorId: userId,
-        price: dto.price,
+        totalPrice: totalPrice,
+        treatments: {
+          create: dto.treatments.map((t) => ({
+            treatmentId: t.treatmentId,
+            price: t.price,
+          })),
+        },
+      },
+      include: {
+        treatments: true,
       },
     });
-    this.orderGateway.emitOrderCreated(createdOrder);
+    this.orderGateway.emitOrderRefresh(userId);
+    await this.sendOrderCreatedNotification(dto, createdOrder.id);
     return createdOrder;
+  }
+
+  async restoreOrder(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status !== OrderStatus.Completed) {
+      throw new BadRequestException('Only completed orders can be restored');
+    }
+
+    const restoredOrder = this.prisma.order.update({
+      where: { id },
+      data: {
+        status: OrderStatus.Created,
+      },
+    });
+    
+    this.orderGateway.completeRefresh(order.operatorId);
+    return restoredOrder;
   }
 
   async completeOrder(id: string, dto: CompleteOrderDto) {
     const order = await this.prisma.order.findUnique({ where: { id } });
 
     if (!order) {
-      throw new Error('Order not found');
+      throw new Error('Order no encontrada');
     }
 
     if (order.status === 'Completed') {
-      throw new Error('Order is already completed');
+      throw new Error('Orden ya está completada');
     }
 
-    return this.prisma.order.update({
+    if (dto.paidAmount < order.totalPrice) {
+      throw new Error('Pago insuficiente para completar la orden');
+    }
+
+    const orderUpdated = this.prisma.order.update({
       where: { id },
       data: {
         paidAmount: dto.paidAmount,
@@ -89,6 +147,9 @@ export class OrdersService {
         ticketNumber: dto.ticketNumber,
       },
     });
+
+    this.orderGateway.completeRefresh(order.operatorId);
+    return orderUpdated;
   }
 
   async updateOrderById(id: string, dto: CreateOrderDto) {
@@ -96,18 +157,14 @@ export class OrdersService {
       where: { id },
       include: { client: true },
     });
-
     if (!existing) {
       throw new Error(`Order with ID ${id} not found`);
     }
-
     if (existing.status === OrderStatus.Completed) {
       throw new Error('Cannot update a completed order');
     }
-
     const isSameDni = dto.clientDni === existing.client.dni;
     let clientIdToUse = existing.clientId;
-
     if (isSameDni) {
       await this.prisma.client.update({
         where: { id: existing.clientId },
@@ -121,7 +178,6 @@ export class OrdersService {
       const existingClient = await this.prisma.client.findUnique({
         where: { dni: dto.clientDni },
       });
-
       if (existingClient) {
         await this.prisma.client.update({
           where: { id: existingClient.id },
@@ -131,7 +187,6 @@ export class OrdersService {
             email: dto.clientEmail,
           },
         });
-
         clientIdToUse = existingClient.id;
       } else {
         const newClient = await this.prisma.client.create({
@@ -142,59 +197,92 @@ export class OrdersService {
             email: dto.clientEmail,
           },
         });
-
         clientIdToUse = newClient.id;
       }
     }
 
-    return this.prisma.order.update({
+    const totalPrice = dto.treatments.reduce(
+      (sum, treatment) => sum + treatment.price,
+      0,
+    );
+
+    const updatedOrder = await this.prisma.order.update({
       where: { id },
       data: {
+        totalPrice: totalPrice,
         client: { connect: { id: clientIdToUse } },
-        ...(dto.treatmentId && {
-          treatment: { connect: { id: dto.treatmentId } },
-        }),
         ...(dto.stylistId && {
           stylist: { connect: { id: dto.stylistId } },
         }),
         ...(dto.cashierId && {
           cashier: { connect: { id: dto.cashierId } },
         }),
-        price: dto.price,
+        treatments: {
+          deleteMany: {},
+          create: dto.treatments.map((treatment) => ({
+            treatment: { connect: { id: treatment.treatmentId } },
+            price: treatment.price,
+          })),
+        },
+      },
+      include: {
+        treatments: true,
       },
     });
+    this.orderGateway.emitOrderRefresh(updatedOrder.operatorId);
+    return updatedOrder;
   }
 
   async getOrderById(id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: {
-        treatment: true,
-        client: true,
-        stylist: true,
-        cashier: true,
+      select: {
+        id: true,
+        createdAt: true,
+        orderNumber: true,
+        totalPrice: true,
+        paidAmount: true,
+        paymentMethod: true,
+        ticketNumber: true,
+        status: true,
+        treatments: {
+          select: {
+            treatment: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            price: true,
+          },
+        },
+        cashier: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        stylist: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        client: {
+          select: {
+            id: true,
+            name: true,
+            dni: true,
+            phone: true,
+            email: true,
+          },
+        },
       },
     });
-
     if (!order) return null;
-
-    return {
-      ...order,
-      stylist: {
-        id: order.stylist.id,
-        email: order.stylist.email,
-        role: order.stylist.role,
-        firstName: order.stylist.firstName,
-        lastName: order.stylist.lastName,
-      },
-      cashier: {
-        id: order.cashierId,
-        email: order.cashier.email,
-        role: order.cashier.role,
-        firstName: order.cashier.firstName,
-        lastName: order.cashier.lastName,
-      },
-    };
+    return order;
   }
 
   async getPendingOrdersForUser(
@@ -225,32 +313,16 @@ export class OrdersService {
       select: {
         id: true,
         createdAt: true,
-        price: true,
         orderNumber: true,
-        treatment: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        cashier: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
+        totalPrice: true,
         stylist: {
           select: {
             id: true,
             firstName: true,
-            lastName: true,
           },
         },
-        clientId: true,
         client: {
           select: {
-            id: true,
             name: true,
           },
         },

@@ -41,7 +41,20 @@ model Treatment {
   name  String
   percentage Float
 
-  orders Order[]
+  orderTreatments OrderTreatment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrderTreatment {
+  id           String   @id @default(uuid())
+  orderId      String
+  treatmentId  String
+  price        Float
+
+  order        Order     @relation(fields: [orderId], references: [id])
+  treatment    Treatment @relation(fields: [treatmentId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -62,10 +75,8 @@ model Order {
   clientId   String
   client     Client  @relation(fields: [clientId], references: [id])
 
-  treatmentId String
-  treatment   Treatment  @relation(fields: [treatmentId], references: [id])
-
-  price Float
+  treatments OrderTreatment[]
+  totalPrice    Float
 
   paidAmount    Float?
   paymentMethod PaymentMethod?
@@ -81,6 +92,7 @@ enum Role {
   Stylist
   Cashier
   Operator
+  Manager
 }
 
 enum OrderStatus {
