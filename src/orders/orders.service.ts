@@ -142,14 +142,10 @@ export class OrdersService {
       throw new Error('Orden ya está completada');
     }
 
-    if (dto.paidAmount < order.totalPrice) {
-      throw new Error('Pago insuficiente para completar la orden');
-    }
-
     const orderUpdated = this.prisma.order.update({
       where: { id },
       data: {
-        paidAmount: dto.paidAmount,
+        paidAmount: order.totalPrice,
         paymentMethod: dto.paymentMethod,
         status: 'Completed',
         ticketNumber: dto.ticketNumber,
@@ -246,6 +242,7 @@ export class OrdersService {
       updatedOrder.cashierId,
       userId,
     );
+    await this.sendOrderCreatedNotification(dto, updatedOrder.id);
     return updatedOrder;
   }
 

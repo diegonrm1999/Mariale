@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from './user.model';
 import { CreateUserDto } from './dto/create-user.dto';
 import { Role } from '@prisma/client';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -25,6 +26,27 @@ export class UsersService {
     });
 
     return User.fromPrisma(created);
+  }
+
+  async updateUser(id: string, dto: UpdateUserDto) {
+    var hashedPassword = null;
+    if (dto.password) {
+      hashedPassword = await bcrypt.hash(dto.password, 10);
+    }
+    const existingUser = await this.prisma.user.findUnique({ where: { id } });
+    if (!existingUser) {
+      throw new Error('User not found');
+    }
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        email: dto.email ?? existingUser.email,
+        password: hashedPassword ?? existingUser.password,
+        role: dto.role ?? existingUser.role,
+      },
+    });
+
+    return updated;
   }
 
   async findStylists() {

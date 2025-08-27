@@ -5,7 +5,7 @@ import * as fs from 'fs';
 
 @Injectable()
 export class FcmService {
-  private readonly projectId = 'dukarmo-app-466618';
+  private readonly projectId = 'dukarmo';
   private auth: GoogleAuth;
 
   constructor() {
