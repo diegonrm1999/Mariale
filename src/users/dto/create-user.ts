@@ -5,5 +5,6 @@ export class CreateUserDto {
   password: string | null;
   firstName: string;
   lastName: string;
+  shopId: string;
   role: Role;
 }

@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Shop {
+  id       String   @id @default(uuid())
+  name     String
+  users        User[]
+  clients      Client[]
+  treatments   Treatment[]
+  orders       Order[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model User {
   id       String   @id @default(uuid())
   email    String?   @unique
@@ -18,6 +30,9 @@ model User {
   stylistOrders Order[] @relation("StylistUser")
   cashierOrders Order[] @relation("CashierUser")
   operatorOrders Order[] @relation("OperatorUser")
+
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -32,6 +47,9 @@ model Client {
 
   orders Order[]
 
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -42,6 +60,9 @@ model Treatment {
   percentage Float
 
   orderTreatments OrderTreatment[]
+
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -71,6 +92,9 @@ model Order {
 
   cashierId  String
   cashier    User     @relation("CashierUser", fields: [cashierId], references: [id])
+
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id])
 
   clientId   String
   client     Client  @relation(fields: [clientId], references: [id])

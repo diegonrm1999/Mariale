@@ -1,4 +1,4 @@
-export class CreateTreatmentDto {
+export class TreatmentDto {
   name: string;
   percentage: number;
 }
