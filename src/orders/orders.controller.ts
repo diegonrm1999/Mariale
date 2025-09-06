@@ -14,7 +14,7 @@ import { OrdersService } from './orders.service';
 import { Request } from 'express';
 import { OrderStatus, Role } from '@prisma/client';
 import { CompleteOrderDto } from './dto/complete-order.dto';
-
+import { AuthUser } from 'src/auth/models/auth-user';
 
 @Controller('orders')
 export class OrdersController {
@@ -22,8 +22,9 @@ export class OrdersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
-  async create(@Body() dto: CreateOrderDto, @Req() req: any) {
-    return this.ordersService.createOrder(dto, req.user.id);
+  async create(@Body() dto: CreateOrderDto, @Req() req: Request) {
+    const user = req.user as AuthUser;
+    return this.ordersService.createOrder(dto, user);
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -55,24 +56,27 @@ export class OrdersController {
   async completeOrder(
     @Param('id') id: string,
     @Body() dto: CompleteOrderDto,
-    @Req() req: any,
+    @Req() req: Request,
   ) {
-    return this.ordersService.completeOrder(id, dto, req.user.id);
+    const user = req.user as AuthUser;
+    return this.ordersService.completeOrder(id, dto, user.id);
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
-  async updateOrderById(
+  async updateOrder(
     @Param('id') id: string,
     @Body() dto: CreateOrderDto,
-    @Req() req: any,
+    @Req() req: Request,
   ) {
-    return this.ordersService.updateOrderById(id, dto, req.user.id);
+    const user = req.user as AuthUser;
+    return this.ordersService.updateOrder(id, dto, user);
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Patch(':id/restore')
-  restoreOrder(@Param('id') id: string, @Req() req: any) {
-    return this.ordersService.restoreOrder(id, req.user.id);
+  restoreOrder(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as AuthUser;
+    return this.ordersService.restoreOrder(id, user.id);
   }
 }

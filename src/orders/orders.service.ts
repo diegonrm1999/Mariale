@@ -1,75 +1,48 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { OrderStatus, Role } from '@prisma/client';
+import { OrderStatus, Prisma, Role } from '@prisma/client';
 import { OrdersGateway } from './orders.gateway';
 import { CompleteOrderDto } from './dto/complete-order.dto';
-import { FcmService } from 'src/fcm/fcm.service';
+import { NotificationService } from 'src/services/notification.service';
+import { AuthUser } from 'src/auth/models/auth-user';
+import { ClientsService } from 'src/client/clients.service';
+import { UsersService } from 'src/users/users.service';
+import { TreatmentsService } from 'src/treatments/treatments.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private readonly orderGateway: OrdersGateway,
-    private readonly fcmService: FcmService,
+    private readonly notificationService: NotificationService,
+    private readonly clientService: ClientsService,
+    private readonly userService: UsersService,
+    private readonly treatmentService: TreatmentsService,
   ) {}
 
-  private async sendOrderCreatedNotification(
-    dto: CreateOrderDto,
-    orderId: string,
-  ) {
-    try {
-      await this.fcmService.sendToTopic(
-        `cashier_${dto.cashierId}`,
-        'Nueva orden creada',
-        'Tienes una nueva orden para completar',
-        {
-          orderId: orderId,
-          type: 'new_order',
-        },
-      );
-    } catch (err) {
-      console.error('Error enviando notificación FCM:', err);
+  private async findOrderByIdWithSelect<T extends Prisma.OrderSelect>(
+    id: string,
+    select: T,
+  ): Promise<Prisma.OrderGetPayload<{ select: T }>> {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select,
+    });
+
+    if (!order) {
+      throw new Error(`Orden no encontrada`);
     }
+
+    return order;
   }
 
-  async createOrder(dto: CreateOrderDto, userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || (user.role !== Role.Operator && user.role !== Role.Manager)) {
-      throw new Error('No tienes permisos para crear órdenes');
-    }
-
-    const treatmentIds = dto.treatments.map((t) => t.treatmentId);
-
-    const treatments = await this.prisma.treatment.findMany({
-      where: { id: { in: treatmentIds } },
-    });
-
-    if (treatments.length !== treatmentIds.length) {
-      throw new Error('Uno o más tratamientos no fueron encontrados');
-    }
-
-    let client = await this.prisma.client.findUnique({
-      where: { dni: dto.clientDni },
-    });
-
-    if (!client) {
-      client = await this.prisma.client.create({
-        data: {
-          dni: dto.clientDni,
-          name: dto.clientName,
-          phone: dto.clientPhone,
-          email: dto.clientEmail,
-        },
-      });
-    }
+  async createOrder(dto: CreateOrderDto, user: AuthUser) {
+    await this.userService.ensureCanCreateOrder(user.id);
+    await this.treatmentService.validateTreatments(
+      dto.treatments.map((t) => t.treatmentId),
+    );
+    let clientId = await this.clientService.upsertOrderClient(dto, user.shopId);
 
     const totalPrice = dto.treatments.reduce(
       (sum, treatment) => sum + treatment.price,
@@ -80,8 +53,9 @@ export class OrdersService {
       data: {
         stylistId: dto.stylistId,
         cashierId: dto.cashierId,
-        clientId: client.id,
-        operatorId: userId,
+        clientId: clientId,
+        operatorId: user.id,
+        shopId: user.shopId,
         totalPrice: totalPrice,
         treatments: {
           create: dto.treatments.map((t) => ({
@@ -97,23 +71,21 @@ export class OrdersService {
     this.orderGateway.emitOrderRefresh(
       createdOrder.operatorId,
       createdOrder.cashierId,
-      userId,
+      user.id,
     );
-    await this.sendOrderCreatedNotification(dto, createdOrder.id);
+    await this.notificationService.assignCashierNotification(dto.cashierId);
     return createdOrder;
   }
 
   async restoreOrder(id: string, userId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
+    const order = await this.findOrderByIdWithSelect(id, {
+      status: true,
+      cashierId: true,
+      operatorId: true,
     });
 
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
     if (order.status !== OrderStatus.Completed) {
-      throw new BadRequestException('Only completed orders can be restored');
+      throw new Error('Solo ordenes completadas pueden ser restauradas');
     }
 
     const restoredOrder = this.prisma.order.update({
@@ -128,17 +100,23 @@ export class OrdersService {
       order.cashierId,
       userId,
     );
+    this.orderGateway.emitOrderRefresh(
+      order.operatorId,
+      order.cashierId,
+      userId,
+    );
     return restoredOrder;
   }
 
   async completeOrder(id: string, dto: CompleteOrderDto, userId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id } });
+    const order = await this.findOrderByIdWithSelect(id, {
+      status: true,
+      cashierId: true,
+      operatorId: true,
+      totalPrice: true,
+    });
 
-    if (!order) {
-      throw new Error('Order no encontrada');
-    }
-
-    if (order.status === 'Completed') {
+    if (order.status === OrderStatus.Completed) {
       throw new Error('Orden ya está completada');
     }
 
@@ -147,7 +125,7 @@ export class OrdersService {
       data: {
         paidAmount: order.totalPrice,
         paymentMethod: dto.paymentMethod,
-        status: 'Completed',
+        status: OrderStatus.Completed,
         ticketNumber: dto.ticketNumber,
       },
     });
@@ -157,57 +135,38 @@ export class OrdersService {
       order.cashierId,
       userId,
     );
+    this.orderGateway.emitOrderRefresh(
+      order.operatorId,
+      order.cashierId,
+      userId,
+    );
     return orderUpdated;
   }
 
-  async updateOrderById(id: string, dto: CreateOrderDto, userId: string) {
-    const existing = await this.prisma.order.findUnique({
-      where: { id },
-      include: { client: true },
-    });
-    if (!existing) {
-      throw new Error(`Order with ID ${id} not found`);
-    }
-    if (existing.status === OrderStatus.Completed) {
-      throw new Error('Cannot update a completed order');
-    }
-    const isSameDni = dto.clientDni === existing.client.dni;
-    let clientIdToUse = existing.clientId;
-    if (isSameDni) {
-      await this.prisma.client.update({
-        where: { id: existing.clientId },
-        data: {
-          name: dto.clientName,
-          phone: dto.clientPhone,
-          email: dto.clientEmail,
+  async updateOrder(id: string, dto: CreateOrderDto, user: AuthUser) {
+    const order = await this.findOrderByIdWithSelect(id, {
+      status: true,
+      cashierId: true,
+      operatorId: true,
+      totalPrice: true,
+      clientId: true,
+      client: {
+        select: {
+          dni: true,
         },
-      });
-    } else {
-      const existingClient = await this.prisma.client.findUnique({
-        where: { dni: dto.clientDni },
-      });
-      if (existingClient) {
-        await this.prisma.client.update({
-          where: { id: existingClient.id },
-          data: {
-            name: dto.clientName,
-            phone: dto.clientPhone,
-            email: dto.clientEmail,
-          },
-        });
-        clientIdToUse = existingClient.id;
-      } else {
-        const newClient = await this.prisma.client.create({
-          data: {
-            dni: dto.clientDni,
-            name: dto.clientName,
-            phone: dto.clientPhone,
-            email: dto.clientEmail,
-          },
-        });
-        clientIdToUse = newClient.id;
-      }
+      },
+    });
+
+    if (order.status === OrderStatus.Completed) {
+      throw new Error('No se puede actualizar una orden completada');
     }
+
+    const clientId = await this.clientService.resolveClientByDni(
+      dto,
+      order.clientId,
+      order.client.dni,
+      user.shopId,
+    );
 
     const totalPrice = dto.treatments.reduce(
       (sum, treatment) => sum + treatment.price,
@@ -218,7 +177,7 @@ export class OrdersService {
       where: { id },
       data: {
         totalPrice: totalPrice,
-        client: { connect: { id: clientIdToUse } },
+        client: { connect: { id: clientId } },
         ...(dto.stylistId && {
           stylist: { connect: { id: dto.stylistId } },
         }),
@@ -240,62 +199,57 @@ export class OrdersService {
     this.orderGateway.emitOrderRefresh(
       updatedOrder.operatorId,
       updatedOrder.cashierId,
-      userId,
+      user.id,
     );
-    await this.sendOrderCreatedNotification(dto, updatedOrder.id);
+    await this.notificationService.assignCashierNotification(dto.cashierId);
     return updatedOrder;
   }
 
   async getOrderById(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        createdAt: true,
-        orderNumber: true,
-        totalPrice: true,
-        paidAmount: true,
-        paymentMethod: true,
-        ticketNumber: true,
-        status: true,
-        treatments: {
-          select: {
-            treatment: {
-              select: {
-                id: true,
-                name: true,
-              },
+    return await this.findOrderByIdWithSelect(id, {
+      id: true,
+      createdAt: true,
+      orderNumber: true,
+      totalPrice: true,
+      paidAmount: true,
+      paymentMethod: true,
+      ticketNumber: true,
+      status: true,
+      treatments: {
+        select: {
+          treatment: {
+            select: {
+              id: true,
+              name: true,
             },
-            price: true,
           },
+          price: true,
         },
-        cashier: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
+      },
+      cashier: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
         },
-        stylist: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
+      },
+      stylist: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
         },
-        client: {
-          select: {
-            id: true,
-            name: true,
-            dni: true,
-            phone: true,
-            email: true,
-          },
+      },
+      client: {
+        select: {
+          id: true,
+          name: true,
+          dni: true,
+          phone: true,
+          email: true,
         },
       },
     });
-    if (!order) return null;
-    return order;
   }
 
   async getPendingOrdersForUser(

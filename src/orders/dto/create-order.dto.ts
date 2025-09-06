@@ -1,19 +1,27 @@
-import { IsArray, ValidateNested, IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import {
+  IsArray,
+  ValidateNested,
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-
-class TreatmentDto {
+export class OrderTreatmentDto {
   @IsString()
-  @IsNotEmpty()
   treatmentId: string;
 
+  @IsNumber()
+  @Min(0.01, { message: 'El precio debe ser mayor a 0' })
   price: number;
 }
 
 export class CreateOrderDto {
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => TreatmentDto)
-  treatments: TreatmentDto[];
+  @Type(() => OrderTreatmentDto)
+  treatments: OrderTreatmentDto[];
 
   @IsString()
   @IsNotEmpty()

@@ -123,6 +123,7 @@ enum OrderStatus {
   Created
   Claimed
   Completed
+  Cancelled
 }
 
 enum PaymentMethod {

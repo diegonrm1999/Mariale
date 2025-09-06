@@ -2,7 +2,7 @@
 CREATE TYPE "Role" AS ENUM ('Stylist', 'Cashier', 'Operator', 'Manager');
 
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('Created', 'Claimed', 'Completed');
+CREATE TYPE "OrderStatus" AS ENUM ('Created', 'Claimed', 'Completed', 'Cancelled');
 
 -- CreateEnum
 CREATE TYPE "PaymentMethod" AS ENUM ('Cash', 'Yape', 'Card');

@@ -86,4 +86,11 @@ export class UsersService {
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
   }
+
+  async ensureCanCreateOrder(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || (user.role !== Role.Operator && user.role !== Role.Manager)) {
+      throw new Error('No tienes permisos para crear órdenes');
+    }
+  }
 }
