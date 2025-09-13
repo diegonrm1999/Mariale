@@ -52,6 +52,8 @@ model Client {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([shopId, name], name: "clients_shop_name")
 }
 
 model Treatment {
@@ -110,6 +112,12 @@ model Order {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([shopId, createdAt(sort: Desc)], name: "orders_shop_date")
+  @@index([shopId, status], name: "orders_shop_status") 
+  @@index([shopId, stylistId], name: "orders_shop_stylist")
+  @@index([shopId, operatorId], name: "orders_shop_operator")
+  @@index([shopId, cashierId], name: "orders_shop_cashier")
 }
 
 enum Role {

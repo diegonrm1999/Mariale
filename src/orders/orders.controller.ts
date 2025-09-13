@@ -7,6 +7,7 @@ import {
   Post,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -15,6 +16,7 @@ import { Request } from 'express';
 import { OrderStatus, Role } from '@prisma/client';
 import { CompleteOrderDto } from './dto/complete-order.dto';
 import { AuthUser } from 'src/auth/models/auth-user';
+import { GetOrdersDto } from './dto/get-order-paginate.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -78,5 +80,12 @@ export class OrdersController {
   restoreOrder(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as AuthUser;
     return this.ordersService.restoreOrder(id, user.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get()
+  async getOrders(@Req() req: Request, @Query() query: GetOrdersDto) {
+    const user = req.user as AuthUser;
+    return this.ordersService.getOrders(user.shopId, query);
   }
 }

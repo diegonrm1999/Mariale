@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, Patch, Param, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Patch,
+  Param,
+  Req,
+  Query,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user';
 import { UpdateUserDto } from './dto/update-user';
@@ -6,6 +15,7 @@ import { UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { AuthUser } from 'src/auth/models/auth-user';
+import { GetUsersDto } from './dto/get-user.dto';
 
 @Controller('users')
 export class Usercontroller {
@@ -29,9 +39,24 @@ export class Usercontroller {
   }
 
   @UseGuards(AuthGuard('jwt'))
-  @Get('cashiers')
-  async getCashiers(@Req() req: Request) {
+  @Get('managers')
+  async getManagers(@Req() req: Request) {
     const user = req.user as AuthUser;
-    return this.userService.findCashiers(user);
+    return this.userService.findManagers(user);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('operators')
+  async getOperators(@Req() req: Request, @Query() query: GetUsersDto) {
+    const user = req.user as AuthUser;
+    return this.userService.findOperators(user, query.strict);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('cashiers')
+  async getCashiers(@Req() req: Request, @Query() query: GetUsersDto) {
+    const user = req.user as AuthUser;
+    console.log(query);
+    return this.userService.findCashiers(user, query.strict);
   }
 }

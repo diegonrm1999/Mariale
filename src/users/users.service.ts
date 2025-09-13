@@ -11,7 +11,10 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async createUser(dto: CreateUserDto) {
-    var hashedPassword = await bcrypt.hash(dto.password, 10);
+    var hashedPassword = null;
+    if (dto.password) {
+      hashedPassword = await bcrypt.hash(dto.password, 10);
+    }
     return await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -69,17 +72,75 @@ export class UsersService {
   async findStylists(user: AuthUser) {
     return this.prisma.user.findMany({
       where: { role: Role.Stylist, shopId: user.shopId },
+      select: {
+        id: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        shopId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 
-  async findCashiers(user: AuthUser) {
+  async findManagers(user: AuthUser) {
+    return this.prisma.user.findMany({
+      where: { role: Role.Manager, shopId: user.shopId },
+      select: {
+        id: true,
+        role: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        shopId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async findOperators(user: AuthUser, strict: boolean = false) {
+    const roles = strict ? [Role.Operator] : [Role.Operator, Role.Manager];
+
     return this.prisma.user.findMany({
       where: {
-        role: {
-          in: [Role.Cashier, Role.Manager],
-        },
+        role: { in: roles },
         shopId: user.shopId,
       },
+      select: {
+        id: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        shopId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+  }
+
+  async findCashiers(user: AuthUser, strict: boolean = false) {
+    const roles = strict ? [Role.Cashier] : [Role.Cashier, Role.Manager];
+
+    return this.prisma.user.findMany({
+      where: {
+        role: { in: roles },
+        shopId: user.shopId,
+      },
+      select: {
+        id: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        shopId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
   }
 

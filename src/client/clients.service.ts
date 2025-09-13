@@ -4,6 +4,8 @@ import { Client } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import axios from 'axios';
 import { CreateOrderDto } from 'src/orders/dto/create-order.dto';
+import { AuthUser } from 'src/auth/models/auth-user';
+import { GetClientsDto } from './dto/get-client.dto';
 
 function capitalizeWords(text: string): string {
   return text
@@ -98,5 +100,104 @@ export class ClientsService {
     } catch (error) {
       throw new Error('Cliente no encontrado ni en la BD ni en Reniec');
     }
+  }
+
+  async findAll(user: AuthUser) {
+    return await this.prisma.client.findMany({
+      where: { shopId: user.shopId },
+    });
+  }
+
+  async getClients(shopId: string, filters: GetClientsDto) {
+    const { page = 1, limit = 20 } = filters;
+    const skip = (page - 1) * limit;
+
+    // Where clause optimizado
+    const where = this.buildWhereClause(shopId, filters);
+
+    // Consultas en paralelo
+    const [clients, totalCount] = await Promise.all([
+      this.prisma.client.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ name: 'asc' }],
+        select: {
+          id: true,
+          dni: true,
+          name: true,
+          phone: true,
+          email: true,
+          createdAt: true,
+          updatedAt: true,
+          // Agregar estadísticas de órdenes
+          orders: {
+            select: {
+              id: true,
+              totalPrice: true,
+              createdAt: true,
+              status: true,
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
+          _count: {
+            select: { orders: true },
+          },
+        },
+      }),
+      this.prisma.client.count({ where }),
+    ]);
+
+    return {
+      data: clients,
+      meta: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNext: page * limit < totalCount,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  private buildWhereClause(shopId: string, filters: GetClientsDto) {
+    const where: any = { shopId };
+    if (filters.search) {
+      where.OR = [
+        {
+          name: {
+            contains: filters.search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          dni: {
+            contains: filters.search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          phone: {
+            contains: filters.search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+    if (filters.startDate || filters.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        where.createdAt.gte = new Date(filters.startDate);
+      }
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        where.createdAt.lte = endDate;
+      }
+    }
+    return where;
   }
 }

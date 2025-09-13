@@ -9,6 +9,7 @@ import { AuthUser } from 'src/auth/models/auth-user';
 import { ClientsService } from 'src/client/clients.service';
 import { UsersService } from 'src/users/users.service';
 import { TreatmentsService } from 'src/treatments/treatments.service';
+import { GetOrdersDto } from './dto/get-order-paginate.dto';
 
 @Injectable()
 export class OrdersService {
@@ -304,5 +305,100 @@ export class OrdersService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async getOrders(shopId: string, filters: GetOrdersDto) {
+    const { page = 1, limit = 20 } = filters;
+    const skip = (page - 1) * limit;
+
+    const where = this.buildWhereClause(shopId, filters);
+
+    const [orders, totalCount] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ createdAt: 'desc' }, { orderNumber: 'desc' }],
+        select: {
+          id: true,
+          orderNumber: true,
+          totalPrice: true,
+          paidAmount: true,
+          paymentMethod: true,
+          status: true,
+          ticketNumber: true,
+          createdAt: true,
+          updatedAt: true,
+          client: {
+            select: {
+              id: true,
+              name: true,
+              dni: true,
+              phone: true,
+            },
+          },
+          stylist: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          operator: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          cashier: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          _count: {
+            select: { treatments: true },
+          },
+        },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return {
+      data: orders,
+      meta: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNext: page * limit < totalCount,
+        hasPrev: page > 1,
+      },
+    };
+  }
+
+  private buildWhereClause(shopId: string, filters: GetOrdersDto) {
+    const where: any = { shopId };
+
+    if (filters.stylistId) where.stylistId = filters.stylistId;
+    if (filters.operatorId) where.operatorId = filters.operatorId;
+    if (filters.cashierId) where.cashierId = filters.cashierId;
+    if (filters.status) where.status = filters.status;
+    if (filters.orderNumber) where.orderNumber = filters.orderNumber;
+
+    if (filters.startDate || filters.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        where.createdAt.gte = new Date(filters.startDate);
+      }
+      if (filters.endDate) {
+        const endDate = new Date(filters.endDate);
+        endDate.setUTCHours(23, 59, 59, 999);
+        where.createdAt.lte = endDate;
+      }
+    }
+    return where;
   }
 }

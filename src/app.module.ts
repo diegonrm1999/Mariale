@@ -14,6 +14,12 @@ import { ClientsModule } from './client/clients.module';
 import { OrdersGateway } from './orders/orders.gateway';
 import { FcmModule } from './fcm/fcm.module';
 import reniecConfig from './config/reniec.config';
+import { NotificationService } from './services/notification.service';
+import { ShopService } from './shop/shop.service';
+import { ShopController } from './shop/shop.controller';
+import { ShopModule } from './shop/shop.module';
+import { ClientsService } from './client/clients.service';
+import { TreatmentsService } from './treatments/treatments.service';
 
 @Module({
   imports: [
@@ -27,13 +33,24 @@ import reniecConfig from './config/reniec.config';
     TreatmentsModule,
     ClientsModule,
     FcmModule,
+    ShopModule,
   ],
   controllers: [
     AppController,
     AuthController,
     OrdersController,
     Usercontroller,
+    ShopController,
   ],
-  providers: [AppService, OrdersService, ConfigService, OrdersGateway],
+  providers: [
+    AppService,
+    OrdersService,
+    ClientsService,
+    TreatmentsService,
+    ConfigService,
+    OrdersGateway,
+    NotificationService,
+    ShopService,
+  ],
 })
 export class AppModule {}
