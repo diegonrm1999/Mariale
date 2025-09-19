@@ -13,6 +13,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthUser } from 'src/auth/models/auth-user';
 import { Request } from 'express';
 import { GetClientsDto } from './dto/get-client.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('clients')
 export class ClientsController {
@@ -27,14 +28,14 @@ export class ClientsController {
     return client;
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('all')
   async getAll(@Req() req: Request) {
     const user = req.user as AuthUser;
     return await this.clientsService.findAll(user);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get()
   @HttpCode(HttpStatus.OK)
   async getClients(@Req() req: Request, @Query() query: GetClientsDto) {

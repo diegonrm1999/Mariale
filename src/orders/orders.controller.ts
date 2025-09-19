@@ -10,26 +10,26 @@ import {
   Query,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { AuthGuard } from '@nestjs/passport';
 import { OrdersService } from './orders.service';
 import { Request } from 'express';
 import { OrderStatus, Role } from '@prisma/client';
 import { CompleteOrderDto } from './dto/complete-order.dto';
 import { AuthUser } from 'src/auth/models/auth-user';
 import { GetOrdersDto } from './dto/get-order-paginate.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('orders')
 export class OrdersController {
   constructor(private ordersService: OrdersService) {}
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() dto: CreateOrderDto, @Req() req: Request) {
     const user = req.user as AuthUser;
     return this.ordersService.createOrder(dto, user);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('active')
   async getPendingOrders(@Req() req: Request) {
     const user = req.user as { id: string; rol: Role };
@@ -38,7 +38,7 @@ export class OrdersController {
     ]);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('completed')
   async getCompletedOrders(@Req() req: Request) {
     const user = req.user as { id: string; rol: Role };
@@ -47,13 +47,13 @@ export class OrdersController {
     ]);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async getOrder(@Param('id') id: string) {
     return this.ordersService.getOrderById(id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/complete')
   async completeOrder(
     @Param('id') id: string,
@@ -64,7 +64,17 @@ export class OrdersController {
     return this.ordersService.completeOrder(id, dto, user.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/cancel')
+  async cancelOrder(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const user = req.user as AuthUser;
+    return this.ordersService.cancelOrder(id, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async updateOrder(
     @Param('id') id: string,
@@ -75,17 +85,23 @@ export class OrdersController {
     return this.ordersService.updateOrder(id, dto, user);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/restore')
   restoreOrder(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as AuthUser;
     return this.ordersService.restoreOrder(id, user.id);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get()
   async getOrders(@Req() req: Request, @Query() query: GetOrdersDto) {
     const user = req.user as AuthUser;
     return this.ordersService.getOrders(user.shopId, query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/send-receipt')
+  async sendOrderReceipt(@Param('id') id: string) {
+    return await this.ordersService.sendOrderReceipt(id);
   }
 }

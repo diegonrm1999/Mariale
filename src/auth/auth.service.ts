@@ -28,7 +28,7 @@ export class AuthService {
       shopId: user.shopId,
     };
     return {
-      access_token: this.jwtService.sign(payload),
+      token: this.jwtService.sign(payload),
       role: user.role,
       id: user.id,
       name: user.firstName,

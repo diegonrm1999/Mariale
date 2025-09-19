@@ -16,6 +16,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { AuthUser } from 'src/auth/models/auth-user';
 import { GetUsersDto } from './dto/get-user.dto';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
 @Controller('users')
 export class Usercontroller {
@@ -31,32 +32,31 @@ export class Usercontroller {
     return this.userService.updateUser(id, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('stylists')
   async getStylists(@Req() req: Request) {
     const user = req.user as AuthUser;
     return this.userService.findStylists(user);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('managers')
   async getManagers(@Req() req: Request) {
     const user = req.user as AuthUser;
     return this.userService.findManagers(user);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('operators')
   async getOperators(@Req() req: Request, @Query() query: GetUsersDto) {
     const user = req.user as AuthUser;
     return this.userService.findOperators(user, query.strict);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(JwtAuthGuard)
   @Get('cashiers')
   async getCashiers(@Req() req: Request, @Query() query: GetUsersDto) {
     const user = req.user as AuthUser;
-    console.log(query);
     return this.userService.findCashiers(user, query.strict);
   }
 }

@@ -76,7 +76,10 @@ export class ClientsService {
   }
 
   async findByDni(dni: string): Promise<Partial<Client>> {
-    const client = await this.prisma.client.findFirst({ where: { dni } });
+    const client = await this.prisma.client.findFirst({
+      where: { dni },
+      select: { dni: true, name: true, phone: true, email: true },
+    });
     if (client) return client;
 
     const apiUrl = this.configService.get<string>('reniec.apiUrl');
