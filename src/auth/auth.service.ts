@@ -21,18 +21,60 @@ export class AuthService {
   }
 
   async login(user: User) {
-    const payload = {
+    const accessPayload = {
       sub: user.id,
       email: user.email,
       rol: user.role,
       shopId: user.shopId,
     };
+
+    const refreshPayload = {
+      sub: user.id,
+      type: 'refresh',
+    };
+
+    const accessToken = this.jwtService.sign(accessPayload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '2d',
+    });
+
+    const refreshToken = this.jwtService.sign(refreshPayload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '4M',
+    });
     return {
-      token: this.jwtService.sign(payload),
+      token: accessToken,
+      refreshToken: refreshToken,
       role: user.role,
       id: user.id,
       name: user.firstName,
       shopId: user.shopId,
     };
+  }
+
+  async refreshTokens(refreshToken: string) {
+    try {
+      console.log(refreshToken);
+      const decoded = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_SECRET,
+      });
+      const user = await this.usersService.findUserById(decoded.sub);
+      if (!user) throw new UnauthorizedException();
+      const newAccessToken = this.jwtService.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          rol: user.role,
+          shopId: user.shopId,
+        },
+        { expiresIn: '2d' },
+      );
+
+      return {
+        token: newAccessToken,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 }

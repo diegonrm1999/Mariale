@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { OrderStatus, Prisma, Role } from '@prisma/client';
+import { OrderStatus, PaymentMethod, Prisma, Role } from '@prisma/client';
 import { OrdersGateway } from './orders.gateway';
 import { CompleteOrderDto } from './dto/complete-order.dto';
 import { NotificationService } from 'src/services/notification.service';
@@ -10,6 +10,8 @@ import { ClientsService } from 'src/client/clients.service';
 import { UsersService } from 'src/users/users.service';
 import { TreatmentsService } from 'src/treatments/treatments.service';
 import { GetOrdersDto } from './dto/get-order-paginate.dto';
+import { EmailService } from 'src/email/email.service';
+import { OrderReceiptData } from 'src/email/dto/order-receipt.dto';
 
 @Injectable()
 export class OrdersService {
@@ -20,6 +22,7 @@ export class OrdersService {
     private readonly clientService: ClientsService,
     private readonly userService: UsersService,
     private readonly treatmentService: TreatmentsService,
+    private readonly emailService: EmailService,
   ) {}
 
   private async findOrderByIdWithSelect<T extends Prisma.OrderSelect>(
@@ -109,6 +112,32 @@ export class OrdersService {
     return restoredOrder;
   }
 
+  async cancelOrder(id: string, userId: string) {
+    const order = await this.findOrderByIdWithSelect(id, {
+      status: true,
+      cashierId: true,
+      operatorId: true,
+      totalPrice: true,
+    });
+
+    if (order.status !== OrderStatus.Created) {
+      throw new Error('Orden no se puede cancelar');
+    }
+
+    const orderUpdated = this.prisma.order.update({
+      where: { id },
+      data: {
+        status: OrderStatus.Cancelled,
+      },
+    });
+    this.orderGateway.emitOrderRefresh(
+      order.operatorId,
+      order.cashierId,
+      userId,
+    );
+    return orderUpdated;
+  }
+
   async completeOrder(id: string, dto: CompleteOrderDto, userId: string) {
     const order = await this.findOrderByIdWithSelect(id, {
       status: true,
@@ -128,6 +157,50 @@ export class OrdersService {
         paymentMethod: dto.paymentMethod,
         status: OrderStatus.Completed,
         ticketNumber: dto.ticketNumber,
+      },
+      select: {
+        id: true,
+        createdAt: true,
+        orderNumber: true,
+        totalPrice: true,
+        paidAmount: true,
+        paymentMethod: true,
+        ticketNumber: true,
+        status: true,
+        treatments: {
+          select: {
+            treatment: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            price: true,
+          },
+        },
+        cashier: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        stylist: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        client: {
+          select: {
+            id: true,
+            name: true,
+            dni: true,
+            phone: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -335,6 +408,7 @@ export class OrdersService {
               name: true,
               dni: true,
               phone: true,
+              email: true,
             },
           },
           stylist: {
@@ -377,6 +451,99 @@ export class OrdersService {
         hasPrev: page > 1,
       },
     };
+  }
+
+  async sendOrderReceipt(
+    orderId: string,
+  ): Promise<{ message: string; status: string }> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          client: true,
+          shop: true,
+          stylist: true,
+          operator: true,
+          cashier: true,
+          treatments: {
+            include: {
+              treatment: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new Error('Orden no encontrada');
+      }
+      this.validateOrderForReceipt(order);
+      const receiptData = this.buildReceiptData(order);
+      await this.emailService.sendOrderReceipt(receiptData);
+      return {
+        message: 'Recibo enviado exitosamente',
+        status: 'success',
+      };
+    } catch (error) {
+      throw Error('Error al enviar el recibo');
+    }
+  }
+
+  private buildReceiptData(order: any): OrderReceiptData {
+    return {
+      orderNumber: order.orderNumber.toString(),
+      ticketNumber: order.ticketNumber || '',
+      clientName: 'Diego Narrea Mori',
+      clientEmail: order.client.email,
+      shopName: order.shop.name,
+      shopAddress1: 'JR. UCAYALI # 724 - GALERIA BARRIO CHINO',
+      shopAddress2: 'SEGUNDO PISO - # 207',
+      shopAddress3: 'LIMA - LIMA - LIMA',
+      shopPhone: '924151512',
+      shopRuc: '20448100180',
+      date: this.formatDate(order.createdAt),
+      time: this.formatTime(order.createdAt),
+      stylistName: 'Juana Sanchez',
+      operatorName: `${order.operator.firstName} ${order.operator.lastName ?? ''}`,
+      cashierName: 'Carlos Torres',
+      treatments: order.treatments.map((orderTreatment) => ({
+        name: orderTreatment.treatment.name,
+        price: orderTreatment.price,
+        quantity: 1,
+      })),
+      totalPrice: order.totalPrice,
+      paidAmount: order.paidAmount || 0,
+      paymentMethod: order.paymentMethod,
+      currency: 'S/',
+    };
+  }
+
+  private formatDate(date: Date): string {
+    return new Intl.DateTimeFormat('es-PE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+  }
+
+  private formatTime(date: Date): string {
+    return new Intl.DateTimeFormat('es-PE', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date);
+  }
+
+  private validateOrderForReceipt(order: any): void {
+    if (order.status !== OrderStatus.Completed) {
+      throw new Error(
+        `Solo se pueden enviar recibos de órdenes completadas. Estado actual: ${order.status}`,
+      );
+    }
+    if (!order.client.email) {
+      throw new Error(
+        `El cliente "${order.client.name}" no tiene email registrado`,
+      );
+    }
   }
 
   private buildWhereClause(shopId: string, filters: GetOrdersDto) {

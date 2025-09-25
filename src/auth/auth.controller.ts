@@ -10,4 +10,9 @@ export class AuthController {
     const loginResponse = await this.authService.login(user);
     return loginResponse;
   }
+
+  @Post('refresh')
+  async refresh(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refreshTokens(refreshToken);
+  }
 }

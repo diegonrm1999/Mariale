@@ -4,7 +4,9 @@ export interface OrderReceiptData {
   clientName: string;
   clientEmail: string;
   shopName: string;
-  shopAddress: string;
+  shopAddress1: string;
+  shopAddress2: string;
+  shopAddress3: string;
   shopPhone: string;
   shopRuc: string;
   date: string;

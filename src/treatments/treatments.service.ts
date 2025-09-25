@@ -39,7 +39,7 @@ export class TreatmentsService {
     const treatments = await this.prisma.treatment.findMany({
       where: { id: { in: treatmentIds } },
     });
-    if (treatments.length !== treatmentIds.length) {
+    if (treatments.length < treatmentIds.length) {
       throw new Error('Uno o más tratamientos no fueron encontrados');
     }
   }

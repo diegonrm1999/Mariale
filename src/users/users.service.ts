@@ -148,6 +148,10 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
+  async findUserById(id: string) {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
+
   async ensureCanCreateOrder(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || (user.role !== Role.Operator && user.role !== Role.Manager)) {

@@ -25,7 +25,12 @@ export class ClientsService {
   async upsertOrderClient(dto: CreateOrderDto, shopId: string) {
     const client = await this.prisma.client.upsert({
       where: { dni: dto.clientDni },
-      update: {},
+      update: {
+        name: dto.clientName,
+        phone: dto.clientPhone,
+        email: dto.clientEmail,
+        shopId,
+      },
       create: {
         dni: dto.clientDni,
         name: dto.clientName,
@@ -34,7 +39,6 @@ export class ClientsService {
         shopId,
       },
     });
-
     return client.id;
   }
 
