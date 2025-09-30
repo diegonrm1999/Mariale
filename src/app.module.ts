@@ -22,8 +22,8 @@ import { ClientsService } from './client/clients.service';
 import { TreatmentsService } from './treatments/treatments.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
-import { EmailService } from './email/email.service';
 import { PdfModule } from './pdf/pdf.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -39,6 +39,7 @@ import { PdfModule } from './pdf/pdf.module';
     FcmModule,
     ShopModule,
     PdfModule,
+    EmailModule,
   ],
   controllers: [
     AppController,
@@ -58,7 +59,6 @@ import { PdfModule } from './pdf/pdf.module';
     NotificationService,
     ShopService,
     DashboardService,
-    EmailService
   ],
 })
 export class AppModule {}
