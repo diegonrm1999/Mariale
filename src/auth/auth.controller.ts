@@ -40,4 +40,23 @@ export class AuthController {
   async refresh(@Body('refreshToken') refreshToken: string) {
     return this.authService.refreshTokens(refreshToken);
   }
+
+  @Post('logout')
+  async logout(@Res({ passthrough: true }) res: Response) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    const cookieOptions: any = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
+      domain: isProduction ? '.dukarmo.com' : 'localhost',
+      maxAge: 0,
+    };
+
+    res.cookie('token', '', cookieOptions);
+    res.cookie('refreshToken', '', cookieOptions);
+
+    return { success: true, message: 'Logged out successfully' };
+  }
 }
