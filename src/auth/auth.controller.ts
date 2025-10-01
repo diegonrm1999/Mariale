@@ -55,7 +55,6 @@ export class AuthController {
     };
 
     res.cookie('token', '', cookieOptions);
-    res.cookie('refreshToken', '', cookieOptions);
 
     return { success: true, message: 'Logged out successfully' };
   }
