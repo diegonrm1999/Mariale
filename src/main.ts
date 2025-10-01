@@ -20,11 +20,13 @@ async function bootstrap() {
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
+      console.log('CORS blocked origin:', origin); // Para debug
       return callback(new Error('CORS blocked: Not allowed by policy'), false);
     },
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   app.useGlobalPipes(
