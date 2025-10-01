@@ -1,3 +1,6 @@
+import { IsString } from 'class-validator';
+
 export class CreateShopDto {
-  name: string
+  @IsString()
+  name: string;
 }
