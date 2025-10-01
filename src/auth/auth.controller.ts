@@ -12,19 +12,23 @@ export class AuthController {
     const user = await this.authService.validateUser(body.email, body.password);
     const loginResponse = await this.authService.login(user);
 
+    const isProduction = process.env.NODE_ENV === 'production';
+
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none' as const, 
-      domain:
-        process.env.NODE_ENV === 'production' ? '.dukarmo.com' : undefined,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
       maxAge: 1000 * 60 * 60 * 24 * 2,
-    };
+    } as const;
+
     res.cookie('token', loginResponse.token, cookieOptions);
+
     res.cookie('refreshToken', loginResponse.refreshToken, {
       ...cookieOptions,
       maxAge: 1000 * 60 * 60 * 24 * 30 * 4,
     });
+
     return loginResponse;
   }
 
