@@ -14,15 +14,16 @@ export class AuthController {
     const loginResponse = await this.authService.login(user);
     res.cookie('token', loginResponse.token, {
       httpOnly: true,
-      secure: true, // en prod con https
-      sameSite: 'none',
-      maxAge: 1000 * 60 * 60 * 24 * 2, 
+      secure: true, 
+      sameSite: 'none', 
+      domain: '.dukarmo.com',
+      maxAge: 1000 * 60 * 60 * 24 * 2,
     });
-
     res.cookie('refreshToken', loginResponse.refreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: 'none',
+      domain: '.dukarmo.com',
       maxAge: 1000 * 60 * 60 * 24 * 30 * 4,
     });
     return loginResponse;
