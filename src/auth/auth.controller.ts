@@ -20,6 +20,7 @@ export class AuthController {
       sameSite: isProduction ? 'none' : 'lax',
       path: '/',
       maxAge: 1000 * 60 * 60 * 24 * 2,
+      domain: isProduction ? '.dukarmo.com' : 'localhost',
     };
 
     res.cookie('token', loginResponse.token, cookieOptions);
