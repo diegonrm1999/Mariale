@@ -159,7 +159,8 @@ export class OrdersService {
     }
 
     const stylistEarnings = order.treatments.reduce((total, orderTreatment) => {
-      return total + orderTreatment.price * orderTreatment.treatment.percentage;
+      const percentage = orderTreatment.treatment.percentage / 100;
+      return total + orderTreatment.price * percentage;
     }, 0);
 
     const orderUpdated = this.prisma.order.update({
