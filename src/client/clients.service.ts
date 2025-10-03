@@ -6,6 +6,7 @@ import axios from 'axios';
 import { CreateOrderDto } from 'src/orders/dto/create-order.dto';
 import { AuthUser } from 'src/auth/models/auth-user';
 import { GetClientsDto } from './dto/get-client.dto';
+import { buildDateFilter } from 'src/utils/filters';
 
 function capitalizeWords(text: string): string {
   return text
@@ -194,17 +195,7 @@ export class ClientsService {
         },
       ];
     }
-    if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        where.createdAt.gte = new Date(filters.startDate);
-      }
-      if (filters.endDate) {
-        const endDate = new Date(filters.endDate);
-        endDate.setUTCHours(23, 59, 59, 999);
-        where.createdAt.lte = endDate;
-      }
-    }
+    where.createdAt = buildDateFilter(filters.startDate, filters.endDate);
     return where;
   }
 }

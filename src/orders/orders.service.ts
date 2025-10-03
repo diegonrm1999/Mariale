@@ -12,6 +12,7 @@ import { TreatmentsService } from 'src/treatments/treatments.service';
 import { GetOrdersDto } from './dto/get-order-paginate.dto';
 import { EmailService } from 'src/email/email.service';
 import { OrderReceiptData } from 'src/email/dto/order-receipt.dto';
+import { buildDateFilter } from 'src/utils/filters';
 
 @Injectable()
 export class OrdersService {
@@ -555,17 +556,7 @@ export class OrdersService {
     if (filters.status) where.status = filters.status;
     if (filters.orderNumber) where.orderNumber = filters.orderNumber;
 
-    if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        where.createdAt.gte = new Date(filters.startDate);
-      }
-      if (filters.endDate) {
-        const endDate = new Date(filters.endDate);
-        endDate.setUTCHours(23, 59, 59, 999);
-        where.createdAt.lte = endDate;
-      }
-    }
+    where.createdAt = buildDateFilter(filters.startDate, filters.endDate);
     return where;
   }
 }
