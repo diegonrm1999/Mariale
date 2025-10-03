@@ -145,11 +145,22 @@ export class OrdersService {
       cashierId: true,
       operatorId: true,
       totalPrice: true,
+      treatments: {
+        include: {
+          treatment: {
+            select: { percentage: true },
+          },
+        },
+      },
     });
 
     if (order.status === OrderStatus.Completed) {
       throw new Error('Orden ya está completada');
     }
+
+    const stylistEarnings = order.treatments.reduce((total, orderTreatment) => {
+      return total + orderTreatment.price * orderTreatment.treatment.percentage;
+    }, 0);
 
     const orderUpdated = this.prisma.order.update({
       where: { id },
@@ -158,6 +169,7 @@ export class OrdersService {
         paymentMethod: dto.paymentMethod,
         status: OrderStatus.Completed,
         ticketNumber: dto.ticketNumber,
+        stylistEarnings: Number(stylistEarnings.toFixed(2)),
       },
       select: {
         id: true,
@@ -419,6 +431,7 @@ export class OrdersService {
               lastName: true,
             },
           },
+          stylistEarnings: true,
           operator: {
             select: {
               id: true,

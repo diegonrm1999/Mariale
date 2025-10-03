@@ -103,6 +103,7 @@ model Order {
 
   treatments OrderTreatment[]
   totalPrice    Float
+  stylistEarnings Float @default(0)
 
   paidAmount    Float?
   paymentMethod PaymentMethod?
