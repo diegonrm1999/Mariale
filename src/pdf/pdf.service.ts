@@ -30,9 +30,9 @@ export class PdfService {
 
   private buildReceiptPDF(doc: PDFKit.PDFDocument, data: OrderReceiptData) {
     const logoPath = path.join(__dirname, '..', 'assets', 'images', 'logo.png');
+
     if (!fs.existsSync(logoPath)) {
       console.error('Logo no encontrado en:', logoPath);
-      console.log('__dirname:', __dirname);
     }
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, (doc.page.width - 150) / 2, doc.y, {

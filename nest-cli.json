@@ -6,8 +6,8 @@
     "deleteOutDir": true,
     "assets": [
       {
-        "include": "assets/**/*",
-        "outDir": "./dist"
+        "include": "../assets/**/*",
+        "outDir": "./dist/assets"
       }
     ],
     "watchAssets": true
