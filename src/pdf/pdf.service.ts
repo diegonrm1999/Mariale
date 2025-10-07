@@ -29,7 +29,7 @@ export class PdfService {
   }
 
   private buildReceiptPDF(doc: PDFKit.PDFDocument, data: OrderReceiptData) {
-    const logoPath = path.resolve('assets', 'images', 'logo.png');
+    const logoPath = path.join(process.cwd(), 'assets', 'images', 'logo.png');
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, (doc.page.width - 150) / 2, doc.y, {
         width: 150,
