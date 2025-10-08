@@ -91,19 +91,6 @@ export class PdfService {
       .text('ESTE NO ES UN COMPROBANTE DE PAGO VÁLIDO', { align: 'center' });
     this.drawDivider(doc);
 
-    const groupedTreatments = data.treatments.reduce(
-      (acc, treatment) => {
-        const existing = acc.find((item) => item.name === treatment.name);
-        if (existing) {
-          existing.quantity += treatment.quantity;
-        } else {
-          acc.push({ ...treatment });
-        }
-        return acc;
-      },
-      [] as Array<{ name: string; price: number; quantity: number }>,
-    );
-
     const getPaymentMethodCode = (paymentMethod: string): string => {
       switch (paymentMethod) {
         case 'Cash':
@@ -133,7 +120,7 @@ export class PdfService {
 
     doc.fontSize(6).font('Helvetica');
 
-    groupedTreatments.forEach((t) => {
+    data.treatments.forEach((t) => {
       const lines = this.splitText(t.name, 80, doc);
       const lineHeight = doc.currentLineHeight();
       const rowHeight = lines.length * lineHeight;
