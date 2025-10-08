@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { OrderStatus, PaymentMethod, Prisma, Role } from '@prisma/client';
+import { OrderStatus, Prisma, Role } from '@prisma/client';
 import { OrdersGateway } from './orders.gateway';
 import { CompleteOrderDto } from './dto/complete-order.dto';
 import { NotificationService } from 'src/services/notification.service';
@@ -14,6 +14,11 @@ import { EmailService } from 'src/email/email.service';
 import { OrderReceiptData } from 'src/email/dto/order-receipt.dto';
 import { buildDateFilter } from 'src/utils/filters';
 
+type OrderTreatment = {
+  treatment: { name: string };
+  price: number;
+  quantity?: number;
+};
 @Injectable()
 export class OrdersService {
   constructor(
@@ -502,6 +507,27 @@ export class OrdersService {
     }
   }
 
+  private mergeTreatments(orderTreatments: OrderTreatment[]) {
+    if (!orderTreatments || orderTreatments.length === 0) return [];
+
+    const out: { name: string; price: number; quantity: number }[] = [];
+    const indexMap = new Map<string, number>();
+    for (const ot of orderTreatments) {
+      const name = ot.treatment.name;
+      const price = ot.price;
+      const qty = ot.quantity ?? 1;
+      const key = `${name}\0${price}`;
+      const idx = indexMap.get(key);
+      if (idx !== undefined) {
+        out[idx].quantity += qty;
+      } else {
+        indexMap.set(key, out.length);
+        out.push({ name, price, quantity: qty });
+      }
+    }
+    return out;
+  }
+
   private buildReceiptData(order: any): OrderReceiptData {
     return {
       orderNumber: order.orderNumber.toString(),
@@ -519,11 +545,7 @@ export class OrdersService {
       stylistName: 'Juana Sanchez',
       operatorName: `${order.operator.firstName} ${order.operator.lastName ?? ''}`,
       cashierName: 'Carlos Torres',
-      treatments: order.treatments.map((orderTreatment) => ({
-        name: orderTreatment.treatment.name,
-        price: orderTreatment.price,
-        quantity: 1,
-      })),
+      treatments: this.mergeTreatments(order.treatments),
       totalPrice: order.totalPrice,
       paidAmount: order.paidAmount || 0,
       paymentMethod: order.paymentMethod,
