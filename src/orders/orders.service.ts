@@ -44,9 +44,8 @@ export class OrdersService {
 
   async createOrder(dto: CreateOrderDto, user: AuthUser) {
     await this.userService.ensureCanCreateOrder(user.id);
-    await this.treatmentService.validateTreatments(
-      dto.treatments.map((t) => t.treatmentId),
-    );
+    const treatmentIds = new Set(dto.treatments.map((t) => t.treatmentId));
+    await this.treatmentService.validateTreatments(treatmentIds);
     let clientId = await this.clientService.upsertOrderClient(dto, user.shopId);
 
     const totalPrice = dto.treatments.reduce(

@@ -35,11 +35,12 @@ export class TreatmentsService {
     });
   }
 
-  async validateTreatments(treatmentIds: string[]): Promise<void> {
+  async validateTreatments(treatmentIds: Set<string>): Promise<void> {
+    if (treatmentIds.size === 0) return;
     const treatments = await this.prisma.treatment.findMany({
-      where: { id: { in: treatmentIds } },
+      where: { id: { in: Array.from(treatmentIds) } },
     });
-    if (treatments.length < treatmentIds.length) {
+    if (treatments.length < treatmentIds.size) {
       throw new Error('Uno o más tratamientos no fueron encontrados');
     }
   }
