@@ -126,6 +126,7 @@ enum Role {
   Cashier
   Operator
   Manager
+  Owner
 }
 
 enum OrderStatus {
