@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { User } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +18,13 @@ export class AuthService {
     const match = await bcrypt.compare(password, user.password);
     if (!match) throw new UnauthorizedException('Contraseña incorrecta');
     return user;
+  }
+
+  async loginAdmin(user: User) {
+    if (user.role !== Role.Owner) {
+      throw new UnauthorizedException('Acceso denegado');
+    }
+    return this.login(user);
   }
 
   async login(user: User) {

@@ -154,7 +154,7 @@ export class UsersService {
 
   async ensureCanCreateOrder(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || (user.role !== Role.Operator && user.role !== Role.Manager)) {
+    if (!user || (user.role !== Role.Operator && user.role !== Role.Manager && user.role !== Role.Owner)) {
       throw new Error('No tienes permisos para crear órdenes');
     }
   }
