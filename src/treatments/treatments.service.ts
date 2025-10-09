@@ -32,6 +32,9 @@ export class TreatmentsService {
       where: {
         shopId: user.shopId,
       },
+      orderBy: {
+        name: 'asc',
+      },
     });
   }
 
