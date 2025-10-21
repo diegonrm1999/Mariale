@@ -9,6 +9,7 @@ export class EmailService {
   private sesClient: SESClient;
   private fromEmail: string;
   private fromName: string;
+  private defaultReceiver: string;
 
   constructor(
     private configService: ConfigService,
@@ -39,6 +40,9 @@ export class EmailService {
 
       this.fromEmail = this.configService.get<string>('AWS_SES_FROM_EMAIL');
       this.fromName = this.configService.get<string>('AWS_SES_FROM_NAME');
+      this.defaultReceiver = this.configService.get<string>(
+        'AWS_SES_DEFAULT_RECEIVER',
+      );
 
       if (!this.fromEmail) {
         throw new Error('AWS_SES_FROM_EMAIL no está configurado');
@@ -75,9 +79,11 @@ export class EmailService {
     const pdfBase64 = pdfBuffer.toString('base64');
     const htmlBody = this.createSimpleEmailBody(data);
 
-    const parts: string[] = [
-      `From: ${fromAddress}`,
-      `To: ${data.clientEmail}`,
+    const parts: string[] = [`From: ${fromAddress}`, `To: ${data.clientEmail}`];
+    if (this.defaultReceiver) {
+      parts.push(`Bcc: ${this.defaultReceiver}`);
+    }
+    parts.push(
       `Subject: =?UTF-8?B?${subjectEncoded}?=`,
       'MIME-Version: 1.0',
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -93,7 +99,7 @@ export class EmailService {
       'Content-Transfer-Encoding: base64',
       `Content-Disposition: attachment; filename="boleta-${data.orderNumber}.pdf"`,
       '',
-    ];
+    );
 
     for (let i = 0; i < pdfBase64.length; i += 76) {
       parts.push(pdfBase64.slice(i, i + 76));
