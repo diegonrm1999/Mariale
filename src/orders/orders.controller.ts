@@ -66,10 +66,7 @@ export class OrdersController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/cancel')
-  async cancelOrder(
-    @Param('id') id: string,
-    @Req() req: Request,
-  ) {
+  async cancelOrder(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as AuthUser;
     return this.ordersService.cancelOrder(id, user.id);
   }
@@ -97,6 +94,16 @@ export class OrdersController {
   async getOrders(@Req() req: Request, @Query() query: GetOrdersDto) {
     const user = req.user as AuthUser;
     return this.ordersService.getOrders(user.shopId, query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('summary/daily')
+  async getDailySummary(@Req() req: Request, @Query('date') date?: string) {
+    const user = req.user as { id: string; rol: Role };
+    return this.ordersService.getDailySummary(
+      user,
+      date ?? new Date().toISOString().split('T')[0],
+    );
   }
 
   @UseGuards(JwtAuthGuard)

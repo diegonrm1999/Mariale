@@ -13,6 +13,7 @@ import { GetOrdersDto } from './dto/get-order-paginate.dto';
 import { EmailService } from 'src/email/email.service';
 import { OrderReceiptData } from 'src/email/dto/order-receipt.dto';
 import { buildDateFilter } from 'src/utils/filters';
+import { DailySummaryResponseDto } from './dto/get-daily-summary.dto';
 
 type OrderTreatment = {
   treatment: { name: string };
@@ -507,6 +508,79 @@ export class OrdersService {
     }
   }
 
+  async getDailySummary(
+    user: { id: string; rol: Role },
+    date: string,
+  ): Promise<DailySummaryResponseDto> {
+    const { start, end } = this.buildDateRange(date);
+    const orders = await this.prisma.order.findMany({
+      where: {
+        cashierId: user.id,
+        status: 'Completed',
+        createdAt: {
+          gte: start,
+          lte: end,
+        },
+      },
+      include: {
+        stylist: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
+
+    const totalEarnings = orders.reduce((sum, o) => sum + o.totalPrice, 0);
+    const totalOrders = orders.length;
+
+    const payments = {
+      cash: 0,
+      yape: 0,
+      card: 0,
+    };
+
+    const mapStylist = new Map<
+      string,
+      { stylistId: string; stylistName: string; count: number }
+    >();
+
+    for (const o of orders) {
+      const amount = o.paidAmount ?? o.totalPrice;
+
+      switch (o.paymentMethod) {
+        case 'Cash':
+          payments.cash += amount;
+          break;
+        case 'Yape':
+          payments.yape += amount;
+          break;
+        case 'Card':
+          payments.card += amount;
+          break;
+      }
+
+      if (!mapStylist.has(o.stylistId)) {
+        mapStylist.set(o.stylistId, {
+          stylistId: o.stylistId,
+          stylistName: `${o.stylist.firstName} ${o.stylist.lastName}`,
+          count: 1,
+        });
+      } else {
+        mapStylist.get(o.stylistId)!.count++;
+      }
+    }
+
+    const ordersByStylist = [...mapStylist.values()];
+
+    return {
+      date,
+      cashierId: user.id,
+      totalEarnings,
+      totalOrders,
+      payments,
+      ordersByStylist,
+    };
+  }
+
   private mergeTreatments(orderTreatments: OrderTreatment[]) {
     if (!orderTreatments || orderTreatments.length === 0) return [];
 
@@ -593,5 +667,11 @@ export class OrdersService {
 
     where.createdAt = buildDateFilter(filters.startDate, filters.endDate);
     return where;
+  }
+
+  private buildDateRange(date: string) {
+    const start = new Date(date + 'T00:00:00.000Z');
+    const end = new Date(date + 'T23:59:59.999Z');
+    return { start, end };
   }
 }
