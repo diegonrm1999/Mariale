@@ -513,9 +513,13 @@ export class OrdersService {
     date: string,
   ): Promise<DailySummaryResponseDto> {
     const { start, end } = this.buildDateRange(date);
+    const userField =
+      user.rol === Role.Cashier
+        ? { cashierId: user.id }
+        : { operatorId: user.id };
     const orders = await this.prisma.order.findMany({
       where: {
-        cashierId: user.id,
+        ...userField,
         status: 'Completed',
         createdAt: {
           gte: start,
