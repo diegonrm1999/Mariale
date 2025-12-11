@@ -405,7 +405,7 @@ export class OrdersService {
 
     const where = this.buildWhereClause(shopId, filters);
 
-    const [orders, totalCount] = await Promise.all([
+    const [orders, totalCount, totalAmountAgg] = await Promise.all([
       this.prisma.order.findMany({
         where,
         skip,
@@ -458,6 +458,12 @@ export class OrdersService {
         },
       }),
       this.prisma.order.count({ where }),
+      this.prisma.order.aggregate({
+        where,
+        _sum: {
+          totalPrice: true,
+        },
+      }),
     ]);
 
     return {
@@ -466,6 +472,7 @@ export class OrdersService {
         page,
         limit,
         total: totalCount,
+        totalAmount: totalAmountAgg._sum.totalPrice ?? 0,
         totalPages: Math.ceil(totalCount / limit),
         hasNext: page * limit < totalCount,
         hasPrev: page > 1,
