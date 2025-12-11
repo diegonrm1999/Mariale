@@ -675,6 +675,7 @@ export class OrdersService {
     if (filters.cashierId) where.cashierId = filters.cashierId;
     if (filters.status) where.status = filters.status;
     if (filters.orderNumber) where.orderNumber = filters.orderNumber;
+    if (filters.paymentMethod) where.paymentMethod = filters.paymentMethod;
 
     where.createdAt = buildDateFilter(filters.startDate, filters.endDate);
     return where;
