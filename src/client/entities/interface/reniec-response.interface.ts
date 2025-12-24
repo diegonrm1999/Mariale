@@ -1,6 +1,9 @@
 interface ReniecResponse {
-  dni: string;
-  nombres: string;
-  apellidoPaterno: string;
-  apellidoMaterno: string;
+  success: boolean;
+  data: {
+    numero: string;
+    nombres: string;
+    apellido_paterno: string;
+    apellido_materno: string;
+  };
 }

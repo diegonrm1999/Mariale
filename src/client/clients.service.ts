@@ -94,9 +94,12 @@ export class ClientsService {
       const fullUrl = `${apiUrl}/${dni}?token=${token}`;
 
       const response = await axios.get<ReniecResponse>(fullUrl);
-      const nombres = response.data.nombres || '';
-      const apellidoPaterno = response.data.apellidoPaterno || '';
-      const apellidoMaterno = response.data.apellidoMaterno || '';
+      if (response.data.success === false) {
+        throw new Error('Cliente no encontrado en Reniec');
+      }
+      const nombres = response.data.data.nombres || '';
+      const apellidoPaterno = response.data.data.apellido_paterno || '';
+      const apellidoMaterno = response.data.data.apellido_materno || '';
 
       const fullName = capitalizeWords(
         `${nombres} ${apellidoPaterno} ${apellidoMaterno}`,
