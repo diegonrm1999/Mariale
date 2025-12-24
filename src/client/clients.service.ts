@@ -91,9 +91,18 @@ export class ClientsService {
     const token = this.configService.get<string>('reniec.token');
 
     try {
-      const fullUrl = `${apiUrl}/${dni}?token=${token}`;
-
-      const response = await axios.get<ReniecResponse>(fullUrl);
+      const response = await axios.post<ReniecResponse>(
+        apiUrl,
+        {
+          dni: dni,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
       if (response.data.success === false) {
         throw new Error('Cliente no encontrado en Reniec');
       }
