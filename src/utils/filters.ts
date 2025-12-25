@@ -1,71 +1,61 @@
+import { DateUtils } from "./date.utils";
+
 export function buildDateFilter(startDate?: string, endDate?: string) {
   const DEFAULT_DAYS_RANGE = 30;
   const MAX_MONTHS_RANGE = 6;
 
   if (startDate && endDate) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const startUTC = DateUtils.parsePeruStartUTC(startDate);
+    const endUTC = DateUtils.parsePeruEndUTC(endDate);
 
     const monthsDiff =
-      (end.getFullYear() - start.getFullYear()) * 12 +
-      (end.getMonth() - start.getMonth());
+      (endUTC.getUTCFullYear() - startUTC.getUTCFullYear()) * 12 +
+      (endUTC.getUTCMonth() - startUTC.getUTCMonth());
 
     if (monthsDiff > MAX_MONTHS_RANGE) {
-      const adjustedEnd = new Date(start);
-      adjustedEnd.setMonth(adjustedEnd.getMonth() + MAX_MONTHS_RANGE);
+      const adjustedEnd = new Date(startUTC);
+      adjustedEnd.setUTCMonth(adjustedEnd.getUTCMonth() + MAX_MONTHS_RANGE);
 
       return {
-        gte: new Date(startDate),
-        lte: getEndOfDay(adjustedEnd),
+        gte: startUTC,
+        lte: DateUtils.getEndOfDayUTC(adjustedEnd),
       };
     }
 
     return {
-      gte: new Date(startDate),
-      lte: getEndOfDay(end),
+      gte: startUTC,
+      lte: endUTC,
     };
   }
 
   if (startDate && !endDate) {
-    const start = new Date(startDate);
-    const end = new Date(start);
-    end.setDate(end.getDate() + DEFAULT_DAYS_RANGE);
+    const startUTC = DateUtils.parsePeruStartUTC(startDate);
+    const end = new Date(startUTC);
+    end.setUTCDate(end.getUTCDate() + DEFAULT_DAYS_RANGE);
 
     return {
-      gte: start,
-      lte: getEndOfDay(end),
+      gte: startUTC,
+      lte: DateUtils.getEndOfDayUTC(end),
     };
   }
 
   if (!startDate && endDate) {
-    const end = new Date(endDate);
-    const start = new Date(end);
-    start.setDate(start.getDate() - DEFAULT_DAYS_RANGE);
+    const endUTC = DateUtils.parsePeruEndUTC(endDate);
+    const start = new Date(endUTC);
+    start.setUTCDate(start.getUTCDate() - DEFAULT_DAYS_RANGE);
 
     return {
-      gte: getStartOfDay(start),
-      lte: getEndOfDay(end),
+      gte: DateUtils.getStartOfDayUTC(start),
+      lte: endUTC,
     };
   }
 
-  const today = new Date();
-  const oneMonthAgo = new Date();
-  oneMonthAgo.setDate(oneMonthAgo.getDate() - DEFAULT_DAYS_RANGE);
+  const todayPeru = DateUtils.getNowInPeru();
+  const oneMonthAgoPeru = new Date(todayPeru);
+  oneMonthAgoPeru.setDate(oneMonthAgoPeru.getDate() - DEFAULT_DAYS_RANGE);
 
   return {
-    gte: getStartOfDay(oneMonthAgo),
-    lte: getEndOfDay(today),
+    gte: DateUtils.getStartOfDayUTC(oneMonthAgoPeru),
+    lte: DateUtils.getEndOfDayUTC(todayPeru),
   };
-}
-
-function getStartOfDay(date: Date): Date {
-  const newDate = new Date(date);
-  newDate.setUTCHours(0, 0, 0, 0);
-  return newDate;
-}
-
-function getEndOfDay(date: Date): Date {
-  const newDate = new Date(date);
-  newDate.setUTCHours(23, 59, 59, 999);
-  return newDate;
 }

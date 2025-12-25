@@ -14,6 +14,7 @@ import { OrderReceiptData } from 'src/email/dto/order-receipt.dto';
 import { buildDateFilter } from 'src/utils/filters';
 import { DailySummaryResponseDto } from './dto/get-daily-summary.dto';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+import { DateUtils } from 'src/utils/date.utils';
 
 type OrderTreatment = {
   treatment: { name: string };
@@ -358,11 +359,9 @@ export class OrdersService {
     user: { id: string; rol: Role },
     statuses: OrderStatus[],
   ) {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = DateUtils.getStartOfDayUTC();
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const endOfDay = DateUtils.getEndOfDayUTC();
 
     const whereClause =
       user.rol === Role.Cashier
@@ -640,11 +639,11 @@ export class OrdersService {
       shopAddress3: 'LIMA - LIMA - LIMA',
       shopPhone: '924151512',
       shopRuc: '20448100180',
-      date: this.formatDate(order.createdAt),
-      time: this.formatTime(order.createdAt),
-      stylistName: 'Juana Sanchez',
+      date: this.formatDate(DateUtils.toPeruTime(order.createdAt)),
+      time: this.formatTime(DateUtils.toPeruTime(order.createdAt)),
+      stylistName: '-',
       operatorName: `${order.operator.firstName} ${order.operator.lastName ?? ''}`,
-      cashierName: 'Carlos Torres',
+      cashierName: '-',
       treatments: this.mergeTreatments(order.treatments),
       totalPrice: order.totalPrice,
       paidAmount: order.paidAmount || 0,

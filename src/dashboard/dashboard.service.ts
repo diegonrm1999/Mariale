@@ -1,21 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { DateUtils } from 'src/utils/date.utils';
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSimpleStats(shopId: string): Promise<DashboardStats> {
-    const now = new Date();
+    const nowPeru = DateUtils.getNowInPeru();
 
-    const startOfToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    );
-    const startOfWeek = this.getStartOfWeek(now);
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfToday = DateUtils.getStartOfDayUTC(nowPeru);
+    const startOfWeek = DateUtils.getStartOfWeekUTC(nowPeru);
+    const startOfMonth = DateUtils.getStartOfMonthUTC(nowPeru);
 
     const [
       totalClients,
@@ -125,12 +122,5 @@ export class DashboardService {
       salesThisMonth: salesThisMonth._sum.totalPrice || 0,
       topStylistWeek,
     };
-  }
-
-  private getStartOfWeek(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    return new Date(d.setDate(diff));
   }
 }
