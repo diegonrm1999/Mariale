@@ -10,7 +10,6 @@ import { ClientsService } from 'src/client/clients.service';
 import { UsersService } from 'src/users/users.service';
 import { TreatmentsService } from 'src/treatments/treatments.service';
 import { GetOrdersDto } from './dto/get-order-paginate.dto';
-import { EmailService } from 'src/email/email.service';
 import { OrderReceiptData } from 'src/email/dto/order-receipt.dto';
 import { buildDateFilter } from 'src/utils/filters';
 import { DailySummaryResponseDto } from './dto/get-daily-summary.dto';
@@ -32,15 +31,7 @@ export class OrdersService {
     private readonly clientService: ClientsService,
     private readonly userService: UsersService,
     private readonly treatmentService: TreatmentsService,
-    private readonly emailService: EmailService,
   ) {
-    console.log('🔧 Inicializando Lambda Client...');
-    console.log('Region:', process.env.AWS_REGION);
-    console.log(
-      'Access Key ID:',
-      process.env.AWS_ACCESS_KEY_ID?.substring(0, 8) + '***',
-    );
-
     this.lambdaClient = new LambdaClient({
       region: 'us-east-1',
       credentials: {
@@ -502,7 +493,6 @@ export class OrdersService {
     orderId: string,
   ): Promise<{ message: string; status: string }> {
     try {
-      console.log('📧 Iniciando sendOrderReceipt para orden:', orderId);
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
         include: {
@@ -524,35 +514,18 @@ export class OrdersService {
       }
       this.validateOrderForReceipt(order);
       const receiptData = this.buildReceiptData(order);
-      console.log('📦 Receipt data preparado:', {
-        orderNumber: receiptData.orderNumber,
-        clientEmail: receiptData.clientEmail,
-        treatmentsCount: receiptData.treatments.length,
-      });
       const command = new InvokeCommand({
         FunctionName: 'GeneratePDFReceipt',
         InvocationType: 'Event',
         Payload: Buffer.from(JSON.stringify(receiptData)),
       });
 
-      const response = await this.lambdaClient.send(command);
-      console.log('✅ Lambda invocado exitosamente');
-      console.log('Status Code:', response.StatusCode);
-      console.log('Request ID:', response.$metadata.requestId);
-
+      await this.lambdaClient.send(command);
       return {
         message: 'Recibo enviado exitosamente',
         status: 'success',
       };
     } catch (error) {
-      console.error('❌ ERROR en sendOrderReceipt:', error);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-
-      if (error.$metadata) {
-        console.error('AWS Error metadata:', error.$metadata);
-      }
       throw Error('Error al enviar el recibo');
     }
   }
