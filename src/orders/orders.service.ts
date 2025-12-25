@@ -536,8 +536,12 @@ export class OrdersService {
     const { start, end } = this.buildDateRange(date);
     const userField =
       user.rol === Role.Cashier
-        ? { cashierId: user.id }
-        : { operatorId: user.id };
+        ? {
+            cashierId: user.id,
+          }
+        : {
+            OR: [{ cashierId: user.id }, { operatorId: user.id }],
+          };
     const orders = await this.prisma.order.findMany({
       where: {
         ...userField,
