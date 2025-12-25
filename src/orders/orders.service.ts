@@ -14,6 +14,7 @@ import { EmailService } from 'src/email/email.service';
 import { OrderReceiptData } from 'src/email/dto/order-receipt.dto';
 import { buildDateFilter } from 'src/utils/filters';
 import { DailySummaryResponseDto } from './dto/get-daily-summary.dto';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 
 type OrderTreatment = {
   treatment: { name: string };
@@ -22,6 +23,8 @@ type OrderTreatment = {
 };
 @Injectable()
 export class OrdersService {
+  private lambdaClient: LambdaClient;
+
   constructor(
     private prisma: PrismaService,
     private readonly orderGateway: OrdersGateway,
@@ -30,7 +33,15 @@ export class OrdersService {
     private readonly userService: UsersService,
     private readonly treatmentService: TreatmentsService,
     private readonly emailService: EmailService,
-  ) {}
+  ) {
+    this.lambdaClient = new LambdaClient({
+      region: 'us-east-1',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
+    });
+  }
 
   private async findOrderByIdWithSelect<T extends Prisma.OrderSelect>(
     id: string,
@@ -505,7 +516,13 @@ export class OrdersService {
       }
       this.validateOrderForReceipt(order);
       const receiptData = this.buildReceiptData(order);
-      await this.emailService.sendOrderReceipt(receiptData);
+      const command = new InvokeCommand({
+        FunctionName: 'GeneratePDFReceipt',
+        InvocationType: 'Event',
+        Payload: Buffer.from(JSON.stringify(receiptData)),
+      });
+
+      await this.lambdaClient.send(command);
       return {
         message: 'Recibo enviado exitosamente',
         status: 'success',
