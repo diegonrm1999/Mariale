@@ -696,8 +696,8 @@ export class OrdersService {
   }
 
   private buildDateRange(date: string) {
-    const start = new Date(date + 'T00:00:00.000Z');
-    const end = new Date(date + 'T23:59:59.999Z');
+    const start = DateUtils.parsePeruStartUTC(date);
+    const end = DateUtils.parsePeruEndUTC(date);
     return { start, end };
   }
 }
